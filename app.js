@@ -109,7 +109,9 @@ app.get("/api/dashboard", authMiddleware, (req, res)=>{
 app.get("/api/admin/dashboard", authMiddleware, requireAdmin, (req, res)=>{
    return res.json({message:`Welcome admin ${req.user.email}`})
 })
+app.get("/", (req, res)=>{
+    res.sendFile(__dirname + "/public/landingpage.html")
+})
 app.listen(port, ()=>{
-    console.log("server started on port 5000");
-    
+    console.log("server started on port 5000");   
 })
