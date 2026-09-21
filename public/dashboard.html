@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Student Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --brand: #1d4ed8;
+    --brand-dark: #14309e;
+    --brand-light: #eff6ff;
+    --ink: #1f2a44;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --page-bg: #f7f8fb;
+    --panel: #ffffff;
+    --gold: #b7791f;
+    --gold-bg: #fdf6e8;
+    --danger: #c53030;
+    --danger-bg: #fdf1f1;
+    --success: #1f7a4d;
+    --success-bg: #eefaf3;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--page-bg);
+    color: var(--ink);
+    font-family: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  h1, h2, h3, .brand, nav a {
+    font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  a { color: inherit; }
+
+  .app {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    background: var(--brand);
+    color: #eaf0ff;
+    padding: 28px 20px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .brand {
+    font-size: 19px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.01em;
+    margin-bottom: 2px;
+  }
+
+  .brand-sub {
+    font-size: 12.5px;
+    color: #b7c7f5;
+    margin-bottom: 34px;
+  }
+
+  nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  nav a {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 14.5px;
+    font-weight: 600;
+    color: #dbe6fc;
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+
+  nav a svg { flex-shrink: 0; opacity: 0.85; }
+
+  nav a:hover { background: rgba(255,255,255,0.08); }
+
+  nav a.active {
+    background: #ffffff;
+    color: var(--brand-dark);
+  }
+
+  nav a.active svg { opacity: 1; }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.15);
+  }
+
+  .logout-link {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14.5px;
+    font-weight: 600;
+    color: #ffd7d7;
+    cursor: pointer;
+  }
+
+  .logout-link:hover { background: rgba(255,255,255,0.08); }
+
+  /* ---------- Main ---------- */
+  main {
+    padding: 30px 40px 60px;
+    max-width: 920px;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .topbar h1 {
+    font-size: 24px;
+    font-weight: 800;
+    margin: 0;
+  }
+
+  .user-chip {
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+
+  .user-chip strong { color: var(--ink); }
+
+  .subtext {
+    color: var(--muted);
+    font-size: 14.5px;
+    margin: 6px 0 28px;
+  }
+
+  section.view { display: none; }
+  section.view.active { display: block; }
+
+  /* ---------- Overview stats ---------- */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+
+  .stat .num {
+    font-family: "Manrope", sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .stat .label {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 6px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+
+  .panel h2 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 4px;
+  }
+
+  .panel .hint {
+    color: var(--muted);
+    font-size: 13.5px;
+    margin: 0 0 18px;
+  }
+
+  /* ---------- Courses ---------- */
+  .course-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .course-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .course-row .name { font-weight: 600; font-size: 14.5px; }
+  .course-row .code { color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+  .remove-btn {
+    background: none;
+    border: none;
+    color: var(--danger);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 6px 10px;
+  }
+  .remove-btn:hover { text-decoration: underline; }
+
+  .empty-state {
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+  }
+
+  .add-form {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .add-form input {
+    flex: 1;
+    padding: 10px 13px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    font-size: 14px;
+    font-family: inherit;
+    background: var(--brand-light);
+  }
+
+  .add-form input:focus {
+    outline: none;
+    border-color: var(--brand);
+  }
+
+  .add-form button {
+    background: var(--brand);
+    color: white;
+    border: none;
+    padding: 0 20px;
+    border-radius: 7px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .add-form button:hover { background: var(--brand-dark); }
+
+  /* ---------- Results table ---------- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14.5px;
+  }
+
+  th {
+    text-align: left;
+    font-size: 12.5px;
+    color: var(--muted);
+    font-weight: 600;
+    padding: 0 12px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 13px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  .grade-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 12.5px;
+  }
+
+  .grade-pill.good { background: var(--success-bg); color: var(--success); }
+  .grade-pill.mid { background: var(--gold-bg); color: var(--gold); }
+  .grade-pill.low { background: var(--danger-bg); color: var(--danger); }
+
+  /* ---------- Profile ---------- */
+  .profile-grid {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    row-gap: 16px;
+    font-size: 14.5px;
+    max-width: 460px;
+  }
+
+  .profile-grid dt { color: var(--muted); }
+  .profile-grid dd { margin: 0; font-weight: 600; }
+
+  .role-badge {
+    display: inline-block;
+    padding: 3px 11px;
+    border-radius: 999px;
+    background: var(--brand-light);
+    color: var(--brand);
+    font-weight: 700;
+    font-size: 12.5px;
+    text-transform: capitalize;
+  }
+
+  .banner {
+    background: var(--gold-bg);
+    border: 1px solid #f0dfb0;
+    color: #7a5a12;
+    font-size: 13.5px;
+    padding: 11px 16px;
+    border-radius: 8px;
+    margin-bottom: 24px;
+  }
+
+  @media (max-width: 720px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar {
+      flex-direction: row;
+      align-items: center;
+      padding: 12px 14px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .brand-sub { display: none; }
+    .brand { margin-bottom: 0; margin-right: 16px; white-space: nowrap; font-size: 17px; }
+    nav { flex-direction: row; gap: 4px; }
+    nav a { white-space: nowrap; padding: 8px 11px; font-size: 13.5px; }
+    .sidebar-footer { margin-top: 0; margin-left: auto; padding-top: 0; border-top: none; flex-shrink: 0; }
+    .logout-link { padding: 8px 10px; white-space: nowrap; }
+    main { padding: 18px 16px 40px; }
+    .topbar { flex-direction: column; align-items: flex-start; gap: 4px; }
+    .topbar h1 { font-size: 20px; }
+    .stat-row { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat { padding: 14px 16px; }
+    .stat .num { font-size: 22px; }
+    .panel { padding: 18px; }
+    .add-form { flex-direction: column; }
+    .add-form input { max-width: none !important; }
+    .add-form button { padding: 11px; }
+    .course-row { flex-wrap: wrap; gap: 8px; }
+    .profile-grid { grid-template-columns: 100px 1fr; font-size: 14px; }
+    table { display: block; overflow-x: auto; white-space: nowrap; }
+  }
+
+  @media (max-width: 420px) {
+    .stat-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">Coursework</div>
+    <div class="brand-sub">Student Portal</div>
+
+    <nav>
+      <a data-view="overview" class="active">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        <span class="nav-text">Overview</span>
+      </a>
+      <a data-view="courses">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <span class="nav-text">My Courses</span>
+      </a>
+      <a data-view="results">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span class="nav-text">Results</span>
+      </a>
+      <a data-view="profile">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+        <span class="nav-text">Profile</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="logout-link" id="logoutBtn">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        <span class="nav-text">Log out</span>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div id="expiredBanner" class="banner" style="display:none;">
+      Your session expired — please log in again.
+    </div>
+
+    <div class="topbar">
+      <h1 id="pageTitle">Overview</h1>
+      <div class="user-chip">Signed in as <strong id="userEmail">…</strong></div>
+    </div>
+    <p class="subtext" id="pageSubtext">A quick look at where things stand.</p>
+
+    <!-- OVERVIEW -->
+    <section class="view active" id="view-overview">
+      <div class="stat-row">
+        <div class="stat">
+          <div class="num" id="statCourses">0</div>
+          <div class="label">Courses enrolled</div>
+        </div>
+        <div class="stat">
+          <div class="num" id="statAverage">—</div>
+          <div class="label">Average grade</div>
+        </div>
+        <div class="stat">
+          <div class="num" id="statRole">—</div>
+          <div class="label">Account type</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Welcome</h2>
+        <p class="hint" id="welcomeMessage">Loading your details…</p>
+      </div>
+    </section>
+
+    <!-- COURSES -->
+    <section class="view" id="view-courses">
+      <div class="panel">
+        <h2>My Courses</h2>
+        <p class="hint">Courses you're currently enrolled in.</p>
+        <div class="course-list" id="courseList"></div>
+        <form class="add-form" id="addCourseForm">
+          <input type="text" id="courseName" placeholder="Course name (e.g. Intro to Databases)" required />
+          <input type="text" id="courseCode" placeholder="Code (e.g. CS201)" style="max-width:140px" required />
+          <button type="submit">Add course</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- RESULTS -->
+    <section class="view" id="view-results">
+      <div class="panel">
+        <h2>Results</h2>
+        <p class="hint">Your grades for completed coursework.</p>
+        <table>
+          <thead>
+            <tr><th>Course</th><th>Assessment</th><th>Grade</th></tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PROFILE -->
+    <section class="view" id="view-profile">
+      <div class="panel">
+        <h2>Profile</h2>
+        <dl class="profile-grid">
+          <dt>Email</dt><dd id="profileEmail">—</dd>
+          <dt>Account type</dt><dd><span class="role-badge" id="profileRole">—</span></dd>
+        </dl>
+      </div>
+    </section>
+  </main>
+
+</div>
+
+<script>
+  const API_DASHBOARD = "/api/dashboard";
+
+  const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+  const savedEmail = localStorage.getItem("email") || sessionStorage.getItem("email") || "";
+  const savedRole = localStorage.getItem("role") || sessionStorage.getItem("role") || "student";
+
+  if (!token) {
+    window.location.href = "login.html";
+  }
+
+  // Show "session expired" banner if we were redirected here after a 401
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("expired") === "true") {
+    document.getElementById("expiredBanner").style.display = "block";
+  }
+
+  function goToLogin(expired) {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    localStorage.removeItem("role");
+    sessionStorage.removeItem("role");
+    window.location.href = expired ? "login.html?expired=true" : "login.html";
+  }
+
+  async function loadOverview() {
+    try {
+      const res = await fetch(API_DASHBOARD, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        goToLogin(true);
+        return;
+      }
+
+      document.getElementById("welcomeMessage").textContent = data.message;
+      document.getElementById("userEmail").textContent = savedEmail;
+      document.getElementById("profileEmail").textContent = savedEmail;
+      document.getElementById("profileRole").textContent = savedRole;
+      document.getElementById("statRole").textContent = savedRole;
+    } catch (err) {
+      document.getElementById("welcomeMessage").textContent = "Couldn't reach the server.";
+    }
+  }
+
+  // ---------- Sidebar navigation ----------
+  const navLinks = document.querySelectorAll("nav a[data-view]");
+  const views = document.querySelectorAll("section.view");
+  const titles = {
+    overview: ["Overview", "A quick look at where things stand."],
+    courses: ["My Courses", "Manage the courses you're enrolled in."],
+    results: ["Results", "Your grades for completed coursework."],
+    profile: ["Profile", "Your account details."]
+  };
+
+  navLinks.forEach(link => {
+    link.addEventListener("click", () => {
+      const view = link.dataset.view;
+      navLinks.forEach(l => l.classList.remove("active"));
+      link.classList.add("active");
+      views.forEach(v => v.classList.remove("active"));
+      document.getElementById(`view-${view}`).classList.add("active");
+      document.getElementById("pageTitle").textContent = titles[view][0];
+      document.getElementById("pageSubtext").textContent = titles[view][1];
+    });
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => goToLogin(false));
+
+  // ---------- Courses (demo data stored locally — see note below) ----------
+  // NOTE: There's no /api/courses endpoint yet, so this section stores
+  // courses in localStorage just so the UI is functional. Once you build
+  // real course routes, replace loadCourses/saveCourses/addCourse with
+  // fetch() calls to your API the same way loadOverview() calls /api/dashboard.
+  function loadCourses() {
+    const raw = localStorage.getItem("demo_courses");
+    return raw ? JSON.parse(raw) : [];
+  }
+
+  function saveCourses(courses) {
+    localStorage.setItem("demo_courses", JSON.stringify(courses));
+  }
+
+  function renderCourses() {
+    const courses = loadCourses();
+    const list = document.getElementById("courseList");
+
+    if (courses.length === 0) {
+      list.innerHTML = `<div class="empty-state">You haven't added any courses yet.</div>`;
+    } else {
+      list.innerHTML = courses.map((c, i) => `
+        <div class="course-row">
+          <div>
+            <div class="name">${c.name}</div>
+            <div class="code">${c.code}</div>
+          </div>
+          <button class="remove-btn" data-index="${i}">Remove</button>
+        </div>
+      `).join("");
+
+      list.querySelectorAll(".remove-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const courses = loadCourses();
+          courses.splice(Number(btn.dataset.index), 1);
+          saveCourses(courses);
+          renderCourses();
+          renderStats();
+        });
+      });
+    }
+  }
+
+  document.getElementById("addCourseForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = document.getElementById("courseName").value.trim();
+    const code = document.getElementById("courseCode").value.trim();
+    if (!name || !code) return;
+
+    const courses = loadCourses();
+    courses.push({ name, code });
+    saveCourses(courses);
+
+    document.getElementById("addCourseForm").reset();
+    renderCourses();
+    renderStats();
+  });
+
+  // ---------- Results (demo data — same note as courses) ----------
+  const demoResults = [
+    { course: "Intro to Databases", assessment: "Midterm", grade: 88 },
+    { course: "Intro to Databases", assessment: "Final Project", grade: 91 },
+    { course: "Web Fundamentals", assessment: "Assignment 2", grade: 76 },
+    { course: "Web Fundamentals", assessment: "Final Exam", grade: 64 }
+  ];
+
+  function gradeClass(score) {
+    if (score >= 80) return "good";
+    if (score >= 65) return "mid";
+    return "low";
+  }
+
+  function renderResults() {
+    const body = document.getElementById("resultsBody");
+    body.innerHTML = demoResults.map(r => `
+      <tr>
+        <td>${r.course}</td>
+        <td>${r.assessment}</td>
+        <td><span class="grade-pill ${gradeClass(r.grade)}">${r.grade}</span></td>
+      </tr>
+    `).join("");
+
+    const avg = Math.round(demoResults.reduce((sum, r) => sum + r.grade, 0) / demoResults.length);
+    document.getElementById("statAverage").textContent = avg;
+  }
+
+  function renderStats() {
+    document.getElementById("statCourses").textContent = loadCourses().length;
+  }
+
+  loadOverview();
+  renderCourses();
+  renderResults();
+  renderStats();
+</script>
+
+</body>
+</html>
