@@ -16,6 +16,12 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "pg": "^8.23.0"
+    "multer": "^2.4.0",
+    "pg": "^8.23.0",
+    "xlsx": "^0.18.5"
+  },
+  "allowScripts": {
+    "multer@2.4.0": true,
+    "xlsx@0.18.5": true
   }
 }

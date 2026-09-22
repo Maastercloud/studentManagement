@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --brand: #1d4ed8;
+    --brand-dark: #14309e;
+    --brand-light: #eff6ff;
+    --gold: #b7791f;
+    --gold-bg: #fdf6e8;
+    --ink: #1f2a44;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --page-bg: #f7f8fb;
+    --panel: #ffffff;
+    --danger: #c53030;
+    --danger-bg: #fdf1f1;
+    --success: #1f7a4d;
+    --success-bg: #eefaf3;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--page-bg);
+    color: var(--ink);
+    font-family: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  h1, h2, h3, .brand, nav a { font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  a { color: inherit; }
+
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    background: #14204a;
+    color: #eaf0ff;
+    padding: 28px 20px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .brand-row { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+  .brand { font-size: 19px; font-weight: 800; color: #ffffff; letter-spacing: -0.01em; }
+  .admin-tag {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+    background: var(--gold); color: #241a04; padding: 2px 7px; border-radius: 5px;
+  }
+  .brand-sub { font-size: 12.5px; color: #9aa8d6; margin-bottom: 34px; }
+
+  nav { display: flex; flex-direction: column; gap: 2px; }
+
+  nav a {
+    display: flex; align-items: center; gap: 11px;
+    padding: 10px 12px; border-radius: 8px; text-decoration: none;
+    font-size: 14.5px; font-weight: 600; color: #c7d1f0; cursor: pointer;
+    transition: background 0.12s ease;
+  }
+
+  nav a svg { flex-shrink: 0; opacity: 0.85; }
+  nav a:hover { background: rgba(255,255,255,0.08); }
+  nav a.active { background: #ffffff; color: var(--brand-dark); }
+  nav a.active svg { opacity: 1; }
+
+  .sidebar-footer { margin-top: auto; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.15); }
+  .logout-link { display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 8px; font-size: 14.5px; font-weight: 600; color: #ffd7d7; cursor: pointer; }
+  .logout-link:hover { background: rgba(255,255,255,0.08); }
+
+  /* ---------- Main ---------- */
+  main { padding: 30px 40px 60px; max-width: 980px; }
+
+  .topbar { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+  .topbar h1 { font-size: 24px; font-weight: 800; margin: 0; }
+  .user-chip { font-size: 13.5px; color: var(--muted); }
+  .user-chip strong { color: var(--ink); }
+  .subtext { color: var(--muted); font-size: 14.5px; margin: 6px 0 28px; }
+
+  section.view { display: none; }
+  section.view.active { display: block; }
+
+  .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+  .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+  .stat .num { font-family: "Manrope", sans-serif; font-size: 28px; font-weight: 800; line-height: 1; }
+  .stat .label { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 24px; }
+  .panel h2 { font-size: 17px; font-weight: 700; margin: 0 0 4px; }
+  .panel .hint { color: var(--muted); font-size: 13.5px; margin: 0 0 18px; }
+
+  /* ---------- Upload ---------- */
+  .upload-box {
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    padding: 28px;
+    text-align: center;
+  }
+
+  .upload-box input[type="file"] { margin-bottom: 14px; }
+
+  .upload-box .file-label {
+    display: block;
+    font-size: 13.5px;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .btn {
+    background: var(--brand); color: white; border: none;
+    padding: 10px 20px; border-radius: 7px; font-size: 14px;
+    font-weight: 600; cursor: pointer; font-family: "Manrope", sans-serif;
+  }
+  .btn:hover { background: var(--brand-dark); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .upload-status { margin-top: 16px; font-size: 13.5px; }
+  .upload-status.success { color: var(--success); }
+  .upload-status.error { color: var(--danger); }
+
+  .error-list {
+    margin-top: 14px; text-align: left; font-size: 13px; color: var(--danger);
+    background: var(--danger-bg); border-radius: 8px; padding: 12px 16px;
+    max-height: 160px; overflow-y: auto;
+  }
+  .error-list div { margin-bottom: 4px; }
+
+  .format-hint {
+    background: var(--brand-light); border-radius: 8px; padding: 12px 16px;
+    font-size: 13px; color: var(--brand-dark); margin-top: 16px; text-align: left;
+  }
+  .format-hint code { background: rgba(29,78,216,0.1); padding: 1px 5px; border-radius: 4px; }
+
+  /* ---------- Students table ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-size: 12.5px; color: var(--muted); font-weight: 600; padding: 0 12px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 12px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+
+  .role-pill {
+    display: inline-block; padding: 3px 10px; border-radius: 999px;
+    font-weight: 700; font-size: 12px; text-transform: capitalize;
+  }
+  .role-pill.student { background: var(--brand-light); color: var(--brand-dark); }
+  .role-pill.admin { background: var(--gold-bg); color: var(--gold); }
+
+  .promote-btn {
+    background: none; border: 1px solid var(--border); color: var(--ink);
+    font-size: 12.5px; font-weight: 600; padding: 5px 12px; border-radius: 6px; cursor: pointer;
+  }
+  .promote-btn:hover { border-color: var(--brand); color: var(--brand-dark); }
+
+  .search-input {
+    width: 100%; padding: 9px 13px; border: 1px solid var(--border);
+    border-radius: 7px; font-size: 14px; font-family: inherit;
+    background: var(--page-bg); margin-bottom: 16px;
+  }
+  .search-input:focus { outline: none; border-color: var(--brand); }
+
+  table-wrap { display: block; overflow-x: auto; }
+
+  @media (max-width: 720px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { flex-direction: row; align-items: center; padding: 12px 14px; overflow-x: auto; position: sticky; top: 0; z-index: 10; }
+    .brand-sub { display: none; }
+    .brand-row { margin-bottom: 0; margin-right: 16px; }
+    nav { flex-direction: row; gap: 4px; }
+    nav a { white-space: nowrap; padding: 8px 11px; font-size: 13.5px; }
+    .sidebar-footer { margin-top: 0; margin-left: auto; padding-top: 0; border-top: none; flex-shrink: 0; }
+    main { padding: 18px 16px 40px; }
+    .topbar { flex-direction: column; align-items: flex-start; gap: 4px; }
+    .stat-row { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .panel { padding: 18px; }
+    table { display: block; overflow-x: auto; white-space: nowrap; }
+  }
+
+  @media (max-width: 420px) {
+    .stat-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand-row">
+      <div class="brand">Coursework</div>
+      <span class="admin-tag">Admin</span>
+    </div>
+    <div class="brand-sub">Admin Console</div>
+
+    <nav>
+      <a data-view="overview" class="active">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        Overview
+      </a>
+      <a data-view="upload">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+        Upload Results
+      </a>
+      <a data-view="students">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Manage Students
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="logout-link" id="logoutBtn">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        Log out
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <h1 id="pageTitle">Overview</h1>
+      <div class="user-chip">Signed in as <strong id="userEmail">…</strong></div>
+    </div>
+    <p class="subtext" id="pageSubtext">A snapshot of the whole portal.</p>
+
+    <!-- OVERVIEW -->
+    <section class="view active" id="view-overview">
+      <div class="stat-row">
+        <div class="stat">
+          <div class="num" id="statStudents">—</div>
+          <div class="label">Total students</div>
+        </div>
+        <div class="stat">
+          <div class="num" id="statResults">—</div>
+          <div class="label">Results recorded</div>
+        </div>
+        <div class="stat">
+          <div class="num" id="statAverage">—</div>
+          <div class="label">Portal-wide average</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Welcome</h2>
+        <p class="hint" id="welcomeMessage">Loading your details…</p>
+      </div>
+    </section>
+
+    <!-- UPLOAD RESULTS -->
+    <section class="view" id="view-upload">
+      <div class="panel">
+        <h2>Upload Results</h2>
+        <p class="hint">Import grades in bulk from a spreadsheet.</p>
+
+        <form id="uploadForm">
+          <div class="upload-box">
+            <input type="file" id="resultsFile" accept=".xlsx,.csv" required />
+            <span class="file-label">Accepts .xlsx or .csv</span>
+            <div>
+              <button type="submit" class="btn" id="uploadBtn">Upload sheet</button>
+            </div>
+          </div>
+        </form>
+
+        <div class="format-hint">
+          Your file needs columns named exactly: <code>email</code>, <code>course</code>, <code>assessment</code>, <code>score</code>. The first row is treated as the header.
+        </div>
+
+        <div id="uploadStatus" class="upload-status"></div>
+        <div id="errorList" class="error-list" style="display:none;"></div>
+      </div>
+    </section>
+
+    <!-- MANAGE STUDENTS -->
+    <section class="view" id="view-students">
+      <div class="panel">
+        <h2>Manage Students</h2>
+        <p class="hint">Every account on the portal, newest first.</p>
+
+        <input type="text" id="studentSearch" class="search-input" placeholder="Search by email..." />
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Email</th><th>Role</th><th>Joined</th><th></th></tr>
+            </thead>
+            <tbody id="studentsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+</div>
+
+<script>
+  const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+  const savedEmail = localStorage.getItem("email") || sessionStorage.getItem("email") || "";
+  const savedRole = localStorage.getItem("role") || sessionStorage.getItem("role") || "";
+
+  if (!token) {
+    window.location.href = "login.html";
+  }
+
+  // Client-side guard: keep non-admins out of the admin UI.
+  // The real security check happens server-side via requireAdmin on every
+  // /api/admin/* route — this is just to avoid a confusing dead-end page.
+  if (savedRole && savedRole !== "admin") {
+    window.location.href = "dashboard.html";
+  }
+
+  function goToLogin() {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    localStorage.removeItem("role");
+    sessionStorage.removeItem("role");
+    window.location.href = "login.html";
+  }
+
+  async function authedFetch(url, options = {}) {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        "Authorization": `Bearer ${token}`
+      }
+    });
+    if (res.status === 401) {
+      goToLogin();
+      throw new Error("Unauthorized");
+    }
+    if (res.status === 403) {
+      window.location.href = "dashboard.html";
+      throw new Error("Forbidden");
+    }
+    return res;
+  }
+
+  // ---------- Navigation ----------
+  const navLinks = document.querySelectorAll("nav a[data-view]");
+  const views = document.querySelectorAll("section.view");
+  const titles = {
+    overview: ["Overview", "A snapshot of the whole portal."],
+    upload: ["Upload Results", "Import grades in bulk from a spreadsheet."],
+    students: ["Manage Students", "Every account on the portal, newest first."]
+  };
+
+  navLinks.forEach(link => {
+    link.addEventListener("click", () => {
+      const view = link.dataset.view;
+      navLinks.forEach(l => l.classList.remove("active"));
+      link.classList.add("active");
+      views.forEach(v => v.classList.remove("active"));
+      document.getElementById(`view-${view}`).classList.add("active");
+      document.getElementById("pageTitle").textContent = titles[view][0];
+      document.getElementById("pageSubtext").textContent = titles[view][1];
+      if (view === "students") loadStudents();
+    });
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", goToLogin);
+
+  // ---------- Overview ----------
+  async function loadOverview() {
+    try {
+      const res = await authedFetch("/api/admin/stats");
+      const data = await res.json();
+
+      document.getElementById("statStudents").textContent = data.totalStudents;
+      document.getElementById("statResults").textContent = data.totalResults;
+      document.getElementById("statAverage").textContent = data.avgScore ?? "—";
+      document.getElementById("userEmail").textContent = savedEmail;
+      document.getElementById("welcomeMessage").textContent =
+        `Welcome, ${savedEmail}. You're signed in with admin access.`;
+    } catch (err) {
+      document.getElementById("welcomeMessage").textContent = "Couldn't reach the server.";
+    }
+  }
+
+  // ---------- Upload ----------
+  document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const file = document.getElementById("resultsFile").files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("sheet", file);
+
+    const status = document.getElementById("uploadStatus");
+    const errorList = document.getElementById("errorList");
+    const uploadBtn = document.getElementById("uploadBtn");
+
+    status.className = "upload-status";
+    status.textContent = "Uploading...";
+    errorList.style.display = "none";
+    uploadBtn.disabled = true;
+
+    try {
+      const res = await authedFetch("/api/admin/upload-results", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        status.classList.add("error");
+        status.textContent = data.message || "Upload failed.";
+        return;
+      }
+
+      status.classList.add("success");
+      status.textContent = `${data.inserted} result(s) imported. ${data.skipped} skipped.`;
+
+      if (data.errors && data.errors.length > 0) {
+        errorList.style.display = "block";
+        errorList.innerHTML = data.errors
+          .map(e => `<div>${e.reason}: ${JSON.stringify(e.row)}</div>`)
+          .join("");
+      }
+
+      document.getElementById("uploadForm").reset();
+
+    } catch (err) {
+      status.classList.add("error");
+      status.textContent = "Couldn't reach the server.";
+    } finally {
+      uploadBtn.disabled = false;
+    }
+  });
+
+  // ---------- Manage Students ----------
+  let allStudents = [];
+
+  async function loadStudents() {
+    try {
+      const res = await authedFetch("/api/admin/students");
+      allStudents = await res.json();
+      renderStudents(allStudents);
+    } catch (err) {
+      // handled by authedFetch redirects; nothing extra to do here
+    }
+  }
+
+  function renderStudents(list) {
+    const body = document.getElementById("studentsBody");
+
+    if (list.length === 0) {
+      body.innerHTML = `<tr><td colspan="4">No accounts found.</td></tr>`;
+      return;
+    }
+
+    body.innerHTML = list.map(u => `
+      <tr>
+        <td>${u.email}</td>
+        <td><span class="role-pill ${u.role}">${u.role}</span></td>
+        <td>${new Date(u.created_at).toLocaleDateString()}</td>
+        <td>
+          <button class="promote-btn" data-email="${u.email}" data-role="${u.role === 'admin' ? 'student' : 'admin'}">
+            ${u.role === 'admin' ? 'Demote to student' : 'Promote to admin'}
+          </button>
+        </td>
+      </tr>
+    `).join("");
+
+    body.querySelectorAll(".promote-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          const res = await authedFetch("/api/admin/promote", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: btn.dataset.email, role: btn.dataset.role })
+          });
+          if (res.ok) {
+            loadStudents();
+          } else {
+            btn.disabled = false;
+          }
+        } catch (err) {
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  document.getElementById("studentSearch").addEventListener("input", (e) => {
+    const q = e.target.value.toLowerCase();
+    renderStudents(allStudents.filter(u => u.email.toLowerCase().includes(q)));
+  });
+
+  loadOverview();
+</script>
+
+</body>
+</html>

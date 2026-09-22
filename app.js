@@ -2,6 +2,8 @@ import express from "express";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
+import multer from "multer"
+import * as XLSX from "xlsx"
 import {fileURLToPath} from "url";
 import { dirname } from "path";
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -12,6 +14,8 @@ const port = 5000;
 const {Pool} = pkg;
 app.use(express.json())
 app.use(express.static(__dirname + "/public"));
+
+const upload = multer({storage: multer.memoryStorage()});
 
 function authMiddleware(req, res, next){
     const authHeader = req.headers.authorization;
@@ -112,6 +116,96 @@ app.get("/api/admin/dashboard", authMiddleware, requireAdmin, (req, res)=>{
 app.get("/", (req, res)=>{
     res.sendFile(__dirname + "/public/landingpage.html")
 })
+app.get("/api/admin/students", authMiddleware, requireAdmin, async (req, res)=>{
+    try{
+    const result = await pool.query("SELECT id, email, role, created_at FROM users ORDER BY created_at DESC");
+    res.json(result.rows)
+    }catch(err){
+        console.log(err);
+        res.status(500).json({message: "Server error"});
+        
+    }
+});
+app.post("/api/admin/promote", authMiddleware, requireAdmin, async(req, res)=>{
+    try {
+        const {email, password} = req.body;
+        if(!["email", "student"].includes(role)){
+            return res.status(401).json({message: "Invalid role"});
+        }
+        const result = await pool.query("UPDATE users SET role = $1 WHERE email = $2 RETURNING id, email, role", [role, email])
+        if(result.rows.length === 0){
+            return res.status(404).json({message: "User not found"});
+        }
+        res.json(result.rows[0])
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({message: "Server error"});
+    }
+})
+app.get("/api/admin/stats", authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const totalStudents = await pool.query("SELECT COUNT(*) FROM users WHERE role = 'student'");
+    const totalResults = await pool.query("SELECT COUNT(*) FROM results");
+    const avgScore = await pool.query("SELECT AVG(score) FROM results");
+
+    res.json({
+      totalStudents: Number(totalStudents.rows[0].count),
+      totalResults: Number(totalResults.rows[0].count),
+      avgScore: avgScore.rows[0].avg ? Number(avgScore.rows[0].avg).toFixed(1) : null
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.post("/api/admin/upload-results", authMiddleware, requireAdmin, upload.single("sheet"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    // Parse the uploaded file straight from memory
+    const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+    // rows now looks like:
+    // [{ email: "a@x.com", course: "CS201", assessment: "Midterm", score: 88 }, ...]
+
+    let inserted = 0;
+    const errors = [];
+
+    for (const row of rows) {
+      const { email, course, assessment, score } = row;
+
+      if (!email || !course || !assessment || score === undefined) {
+        errors.push({ row, reason: "Missing required field" });
+        continue;
+      }
+
+      const userResult = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+
+      if (userResult.rows.length === 0) {
+        errors.push({ row, reason: "No student found with this email" });
+        continue;
+      }
+
+      const studentId = userResult.rows[0].id;
+
+      await pool.query(
+        "INSERT INTO results(student_id, course, assessment, score) VALUES($1, $2, $3, $4)",
+        [studentId, course, assessment, score]
+      );
+      inserted++;
+    }
+
+    res.json({ message: `Imported ${inserted} results`, inserted, skipped: errors.length, errors });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 app.listen(port, ()=>{
     console.log("server started on port 5000");   
 })

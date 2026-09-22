@@ -300,12 +300,15 @@
       if (data.role) {
         storage.setItem("role", data.role);
       }
+      if(data.email){
+        storage.setItem("email", data.email);
+      }
 
       formStatus.textContent = "Logged in! Redirecting...";
       formStatus.classList.add("success");
 
       setTimeout(() => {
-        window.location.href = data.role === "admin" ? "/admin/dashboard.html" : "/dashboard.html";
+        window.location.href = data.role === "admin" ? "/admin-dashboard.html" : "/dashboard.html";
       }, 700);
 
     } catch (err) {
