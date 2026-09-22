@@ -63,7 +63,7 @@ try {
     res.status(500).json({message: "Server error"});
 }
 })
-app.get("/api/signup", (req, res)=>{
+app.get("/signup", (req, res)=>{
     res.sendFile(__dirname + "/public/signup.html")
 })
 app.get("/api/login.html", (req, res)=>{
