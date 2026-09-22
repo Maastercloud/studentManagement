@@ -620,41 +620,69 @@
   });
 
   // ---------- Results (demo data — same note as courses) ----------
-  const demoResults = [
-    { course: "Intro to Databases", assessment: "Midterm", grade: 88 },
-    { course: "Intro to Databases", assessment: "Final Project", grade: 91 },
-    { course: "Web Fundamentals", assessment: "Assignment 2", grade: 76 },
-    { course: "Web Fundamentals", assessment: "Final Exam", grade: 64 }
-  ];
+ async function renderResults() {
+  const body = document.getElementById("resultsBody");
 
+  try {
+    const res = await fetch("/api/results", {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const results = await res.json();
+
+    if (!res.ok) {
+      body.innerHTML = `<tr><td colspan="3">Couldn't load results.</td></tr>`;
+      return;
+    }
+
+    if (results.length === 0) {
+      body.innerHTML = `<tr><td colspan="3">No results yet.</td></tr>`;
+      document.getElementById("statAverage").textContent = "—";
+      return;
+    }
+
+    body.innerHTML = results.map(r => `
+      <tr>
+        <td>${r.course}</td>
+        <td>${r.assessment}</td>
+        <td><span class="grade-pill ${gradeClass(r.score)}">${r.score}</span></td>
+      </tr>
+    `).join("");
+
+    const avg = Math.round(results.reduce((sum, r) => sum + Number(r.score), 0) / results.length);
+    document.getElementById("statAverage").textContent = avg;
+
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="3">Couldn't reach the server.</td></tr>`;
+  }
+}
   function gradeClass(score) {
     if (score >= 80) return "good";
     if (score >= 65) return "mid";
     return "low";
   }
 
-  function renderResults() {
-    const body = document.getElementById("resultsBody");
-    body.innerHTML = demoResults.map(r => `
-      <tr>
-        <td>${r.course}</td>
-        <td>${r.assessment}</td>
-        <td><span class="grade-pill ${gradeClass(r.grade)}">${r.grade}</span></td>
-      </tr>
-    `).join("");
+  // function renderResults() {
+  //   const body = document.getElementById("resultsBody");
+  //   body.innerHTML = demoResults.map(r => `
+  //     <tr>
+  //       <td>${r.course}</td>
+  //       <td>${r.assessment}</td>
+  //       <td><span class="grade-pill ${gradeClass(r.grade)}">${r.grade}</span></td>
+  //     </tr>
+  //   `).join("");
 
-    const avg = Math.round(demoResults.reduce((sum, r) => sum + r.grade, 0) / demoResults.length);
-    document.getElementById("statAverage").textContent = avg;
-  }
+  //   const avg = Math.round(demoResults.reduce((sum, r) => sum + r.grade, 0) / demoResults.length);
+  //   document.getElementById("statAverage").textContent = avg;
+  // }
 
   function renderStats() {
     document.getElementById("statCourses").textContent = loadCourses().length;
   }
 
-  loadOverview();
-  renderCourses();
-  renderResults();
-  renderStats();
+ loadOverview();
+renderCourses();
+renderResults();
+renderStats();
 </script>
 
 </body>

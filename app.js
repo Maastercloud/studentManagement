@@ -206,6 +206,46 @@ app.post("/api/admin/upload-results", authMiddleware, requireAdmin, upload.singl
     res.status(500).json({ message: "Server error" });
   }
 });
+app.get("/api/admin/download-template", authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query("SELECT email FROM users WHERE role = 'student' ORDER BY email");
+
+    const rows = result.rows.map(r => ({
+      email: r.email,
+      course: "",
+      assessment: "",
+      score: ""
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet["!cols"] = [{ wch: 28 }, { wch: 14 }, { wch: 16 }, { wch: 10 }];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Results");
+
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+    res.setHeader("Content-Disposition", "attachment; filename=results_template.xlsx");
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.send(buffer);
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+app.get("/api/results", authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT course, assessment, score FROM results WHERE student_id = $1 ORDER BY created_at DESC",
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 app.listen(port, ()=>{
     console.log("server started on port 5000");   
 })
