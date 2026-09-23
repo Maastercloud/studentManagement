@@ -210,6 +210,10 @@
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Manage Students
       </a>
+      <a data-view="broadsheet">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/></svg>
+        Results Broadsheet
+      </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -255,10 +259,7 @@
       <div class="panel">
         <h2>Upload Results</h2>
         <p class="hint">Import grades in bulk from a spreadsheet.</p>
-     <button type="button" id="downloadTemplateBtn"
-        style="background:none; border:none; color:#1d4ed8; font-weight:600; font-size:13.5px; cursor:pointer; padding:0; margin-bottom:16px;">
-  ⬇ Download template
-</button>
+
         <form id="uploadForm">
           <div class="upload-box">
             <input type="file" id="resultsFile" accept=".xlsx,.csv" required />
@@ -292,6 +293,29 @@
               <tr><th>Email</th><th>Role</th><th>Joined</th><th></th></tr>
             </thead>
             <tbody id="studentsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- RESULTS BROADSHEET -->
+    <section class="view" id="view-broadsheet">
+      <div class="panel">
+        <h2>Results Broadsheet</h2>
+        <p class="hint">Pick a course to see every student's score for it.</p>
+
+        <select id="courseSelect" class="search-input">
+          <option value="">Select a course…</option>
+        </select>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Student</th><th>Assessment</th><th>Score</th></tr>
+            </thead>
+            <tbody id="broadsheetBody">
+              <tr><td colspan="3">Choose a course above to load results.</td></tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -349,7 +373,8 @@
   const titles = {
     overview: ["Overview", "A snapshot of the whole portal."],
     upload: ["Upload Results", "Import grades in bulk from a spreadsheet."],
-    students: ["Manage Students", "Every account on the portal, newest first."]
+    students: ["Manage Students", "Every account on the portal, newest first."],
+    broadsheet: ["Results Broadsheet", "Pick a course to see every student's score for it."]
   };
 
   navLinks.forEach(link => {
@@ -362,6 +387,7 @@
       document.getElementById("pageTitle").textContent = titles[view][0];
       document.getElementById("pageSubtext").textContent = titles[view][1];
       if (view === "students") loadStudents();
+      if (view === "broadsheet") loadCourseOptions();
     });
   });
 
@@ -496,24 +522,61 @@
     renderStudents(allStudents.filter(u => u.email.toLowerCase().includes(q)));
   });
 
-  loadOverview();
-  document.getElementById("downloadTemplateBtn").addEventListener("click", async () => {
-  try {
-    const res = await authedFetch("/api/admin/download-template");
-    const blob = await res.blob();
+  // ---------- Results Broadsheet ----------
+  let coursesLoaded = false;
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "results_template.xlsx";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    // authedFetch already redirects on 401/403
+  async function loadCourseOptions() {
+    if (coursesLoaded) return; // only fetch the course list once per page load
+    try {
+      const res = await authedFetch("/api/admin/courses");
+      const courses = await res.json();
+
+      const select = document.getElementById("courseSelect");
+      courses.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        select.appendChild(opt);
+      });
+      coursesLoaded = true;
+    } catch (err) {
+      // authedFetch already redirects on 401/403
+    }
   }
-});
+
+  document.getElementById("courseSelect").addEventListener("change", async (e) => {
+    const course = e.target.value;
+    const body = document.getElementById("broadsheetBody");
+
+    if (!course) {
+      body.innerHTML = `<tr><td colspan="3">Choose a course above to load results.</td></tr>`;
+      return;
+    }
+
+    body.innerHTML = `<tr><td colspan="3">Loading…</td></tr>`;
+
+    try {
+      const res = await authedFetch(`/api/admin/results?course=${encodeURIComponent(course)}`);
+      const rows = await res.json();
+
+      if (rows.length === 0) {
+        body.innerHTML = `<tr><td colspan="3">No results recorded for this course yet.</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = rows.map(r => `
+        <tr>
+          <td>${r.email}</td>
+          <td>${r.assessment}</td>
+          <td>${r.score}</td>
+        </tr>
+      `).join("");
+    } catch (err) {
+      body.innerHTML = `<tr><td colspan="3">Couldn't load results.</td></tr>`;
+    }
+  });
+
+  loadOverview();
 </script>
 
 </body>

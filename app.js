@@ -246,6 +246,41 @@ app.get("/api/results", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+app.get("/api/admin/courses", authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query("SELECT DISTINCT course FROM results ORDER BY course");
+    res.json(result.rows.map(r => r.course));
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.get("/api/admin/results", authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const { course } = req.query;
+
+    let query = `
+      SELECT u.email, r.course, r.assessment, r.score
+      FROM results r
+      JOIN users u ON u.id = r.student_id
+    `;
+    const params = [];
+
+    if (course) {
+      query += " WHERE r.course = $1";
+      params.push(course);
+    }
+
+    query += " ORDER BY u.email, r.assessment";
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 app.listen(port, ()=>{
     console.log("server started on port 5000");   
 })
