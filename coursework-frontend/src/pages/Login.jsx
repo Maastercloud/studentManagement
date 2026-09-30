@@ -31,7 +31,7 @@ export default function Login() {
       login(data);
       navigate(data.role === "admin" ? "/admin" : "/dashboard");
     } catch (err) {
-      setError("Couldn't reach the server.");
+      setError("Invalid credentials.");
     } finally {
       setLoading(false);
     }
