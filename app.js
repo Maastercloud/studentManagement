@@ -12,7 +12,7 @@ dotenv.config();
 import pkg from "pg";
 const app = express();
 const port = 5000;
-app.use(cors())
+app.use(cors({ origin: ["http://localhost:5173", "https://student-management-bay-one.vercel.app"] }));
 const {Pool} = pkg;
 app.use(express.json())
 app.use(express.static(__dirname + "/public"));
