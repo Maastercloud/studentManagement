@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import multer from "multer"
+import cors from "cors"
 import * as XLSX from "xlsx"
 import {fileURLToPath} from "url";
 import { dirname } from "path";
@@ -11,6 +12,7 @@ dotenv.config();
 import pkg from "pg";
 const app = express();
 const port = 5000;
+app.use(cors())
 const {Pool} = pkg;
 app.use(express.json())
 app.use(express.static(__dirname + "/public"));
@@ -48,54 +50,72 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL
 })
 app.post("/api/signup", async(req, res)=>{
-try {
-    
+  try {
     const email = req.body["email"];
     const password = req.body["password"];
-    
-    const hashedPassword = await bcrypt.hash(password, 10)
-    const result = await pool.query("INSERT INTO users(email, password, role) VALUES($1, $2, 'student') RETURNING id, email", [email, hashedPassword]);
-    res.json(result.rows)
-    console.log(result.rows);
-    
-} catch (err) {
-    if(err.code == '23505'){
-        res.status(409).json({message: "Email already in use"});
-    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      "INSERT INTO users(email, password, role) VALUES($1, $2, 'student') RETURNING id, email",
+      [email, hashedPassword]
+    );
+
+    const newUser = result.rows[0];
+    const learnerId = `STU-${String(newUser.id).padStart(6, "0")}`;
+
+    await pool.query("UPDATE users SET learner_id = $1 WHERE id = $2", [learnerId, newUser.id]);
+
+    res.json({ id: newUser.id, learnerId });
+
+  } catch (err) {
     console.log(err);
-    
-    res.status(500).json({message: "Server error"});
-}
-})
+    if (err.code === "23505") {
+      return res.status(409).json({ message: "Email already in use" });
+    }
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 app.get("/signup", (req, res)=>{
     res.sendFile(__dirname + "/public/signup.html")
 })
-app.get("/api/login.html", (req, res)=>{
-    res.sendFile(__dirname + "/public/login.html")
-})
+
 app.post("/api/login", async(req, res)=>{
     try {
-        const {email, password} = req.body;
-        const result = await pool.query("SELECT id, email, password, role FROM users WHERE email = $1", [email]);
-        if(result.rows.length==0){
+        const {identifier, password} = req.body;
+
+        const result = await pool.query(
+          "SELECT id, email, password, role, learner_id FROM users WHERE email = $1 OR learner_id = $1",
+          [identifier]
+        );
+
+        if(result.rows.length == 0){
            return res.status(401).json({message: "Invalid details"});
         }
-        const user = result.rows[0]
+
+        const user = result.rows[0];  
+        if (identifier === user.email && user.role !== "admin") {
+          return res.status(401).json({ message: "Students must log in with their Learner ID, not email" });
+        }
+
         const isMatch = await bcrypt.compare(password, user.password);
         if(!isMatch){
-           return res.status(401).json({message: "Invalid credentials"})
+           return res.status(401).json({message: "Invalid credentials"});
         }
+
         const token = jwt.sign({
-            id:user.id, email:user.email, role:user.role
+            id:user.id, email:user.email, role:user.role, learnerId: user.learner_id
         }, process.env.JWT_SECRET, {expiresIn: "1h"});
-       return res.json({token, role:user.role, email: user.email})
-        // res.send("User is active")
+
+       return res.json({token, role:user.role, email: user.email, learnerId: user.learner_id});
+
     } catch (err) {
         console.log(err);
-        
         res.status(500).json({message: "Server error"})
     }
 })
+
+
 app.get("/api/myUsers", async(req, res)=>{
     try {
         const result = await pool.query("SELECT * FROM users")
@@ -116,16 +136,18 @@ app.get("/api/admin/dashboard", authMiddleware, requireAdmin, (req, res)=>{
 app.get("/", (req, res)=>{
     res.sendFile(__dirname + "/public/landingpage.html")
 })
-app.get("/api/admin/students", authMiddleware, requireAdmin, async (req, res)=>{
-    try{
-    const result = await pool.query("SELECT id, email, role, created_at FROM users ORDER BY created_at DESC");
-    res.json(result.rows)
-    }catch(err){
-        console.log(err);
-        res.status(500).json({message: "Server error"});
-        
-    }
+app.get("/api/admin/students", authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, email, learner_id, role, created_at FROM users ORDER BY created_at DESC"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
 });
+
 app.post("/api/admin/promote", authMiddleware, requireAdmin, async(req, res)=>{
     try {
         const {email, password} = req.body;
@@ -245,6 +267,7 @@ app.get("/api/results", authMiddleware, async (req, res) => {
     console.log(err);
     res.status(500).json({ message: "Server error" });
   }
+
 });
 app.get("/api/admin/courses", authMiddleware, requireAdmin, async (req, res) => {
   try {
@@ -276,6 +299,95 @@ app.get("/api/admin/results", authMiddleware, requireAdmin, async (req, res) => 
 
     const result = await pool.query(query, params);
     res.json(result.rows);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+//Attendance and payment
+
+app.post("/api/attendance/mark", authMiddleware, async (req, res) => {
+  try {
+    await pool.query(
+      "INSERT INTO attendance(student_id, date) VALUES($1, CURRENT_DATE)",
+      [req.user.id]
+    );
+    res.json({ message: "Attendance marked for today" });
+  } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({ message: "You've already marked attendance today" });
+    }
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.get("/api/attendance", authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT date FROM attendance WHERE student_id = $1 ORDER BY date DESC",
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ---------- Fees ----------
+
+const FEE_AMOUNT = 50000; 
+
+app.get("/api/fees", authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT amount, reference, paid_at FROM fee_payments WHERE student_id = $1 AND status = 'success' ORDER BY paid_at DESC",
+      [req.user.id]
+    );
+    const totalPaid = result.rows.reduce((sum, r) => sum + Number(r.amount), 0);
+
+    res.json({
+      totalDue: FEE_AMOUNT,
+      totalPaid,
+      balance: Math.max(FEE_AMOUNT - totalPaid, 0),
+      payments: result.rows,
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.post("/api/fees/verify", authMiddleware, async (req, res) => {
+  try {
+    const { reference } = req.body;
+    if (!reference) return res.status(400).json({ message: "Missing reference" });
+
+    // Ask Paystack directly whether this transaction actually succeeded —
+    // never trust the frontend's word alone that a payment went through
+    const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
+    });
+    const verifyData = await verifyRes.json();
+
+    if (!verifyData.status || verifyData.data.status !== "success") {
+      return res.status(400).json({ message: "Payment could not be verified" });
+    }
+
+    const amount = verifyData.data.amount / 100; // Paystack returns kobo, not Naira
+
+    try {
+      await pool.query(
+        "INSERT INTO fee_payments(student_id, amount, reference, status, paid_at) VALUES($1, $2, $3, 'success', NOW())",
+        [req.user.id, amount, reference]
+      );
+    } catch (err) {
+      if (err.code !== "23505") throw err; // duplicate reference = already recorded, safe to ignore
+    }
+
+    res.json({ message: "Payment verified", amount });
   } catch (err) {
     console.log(err);
     res.status(500).json({ message: "Server error" });
