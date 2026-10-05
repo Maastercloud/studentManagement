@@ -393,6 +393,175 @@ app.post("/api/fees/verify", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+app.post("/api/admin/exams", authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const { course, title, durationMinutes, questions } = req.body;
+
+    if (!course || !title || !Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    const examResult = await pool.query(
+      "INSERT INTO exams(course, title, duration_minutes) VALUES($1, $2, $3) RETURNING id",
+      [course, title, durationMinutes || 30]
+    );
+    const examId = examResult.rows[0].id;
+
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      await pool.query(
+        "INSERT INTO exam_questions(exam_id, question_text, options, correct_index, position) VALUES($1, $2, $3, $4, $5)",
+        [examId, q.questionText, JSON.stringify(q.options), q.correctIndex, i]
+      );
+    }
+
+    res.json({ message: "Exam created", examId });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.get("/api/admin/exams", authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT e.id, e.course, e.title, e.duration_minutes, e.created_at,
+             COUNT(DISTINCT q.id) AS question_count,
+             COUNT(DISTINCT a.id) AS attempt_count
+      FROM exams e
+      LEFT JOIN exam_questions q ON q.exam_id = e.id
+      LEFT JOIN exam_attempts a ON a.exam_id = e.id
+      GROUP BY e.id
+      ORDER BY e.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.get("/api/exams", authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT e.id, e.course, e.title, e.duration_minutes,
+             a.status AS attempt_status, a.score
+      FROM exams e
+      LEFT JOIN exam_attempts a ON a.exam_id = e.id AND a.student_id = $1
+      ORDER BY e.created_at DESC
+    `, [req.user.id]);
+    res.json(result.rows);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.post("/api/exams/:id/start", authMiddleware, async (req, res) => {
+  try {
+    const examId = req.params.id;
+
+    const examResult = await pool.query("SELECT * FROM exams WHERE id = $1", [examId]);
+    if (examResult.rows.length === 0) {
+      return res.status(404).json({ message: "Exam not found" });
+    }
+    const exam = examResult.rows[0];
+
+    let attemptResult = await pool.query(
+      "SELECT * FROM exam_attempts WHERE exam_id = $1 AND student_id = $2",
+      [examId, req.user.id]
+    );
+
+    let attempt;
+    if (attemptResult.rows.length === 0) {
+      const insertResult = await pool.query(
+        "INSERT INTO exam_attempts(exam_id, student_id) VALUES($1, $2) RETURNING *",
+        [examId, req.user.id]
+      );
+      attempt = insertResult.rows[0];
+    } else {
+      attempt = attemptResult.rows[0];
+      if (attempt.status === "submitted") {
+        return res.status(409).json({ message: "You've already submitted this exam" });
+      }
+    }
+
+    // Never send correct_index to the student before they submit
+    const questionsResult = await pool.query(
+      "SELECT id, question_text, options FROM exam_questions WHERE exam_id = $1 ORDER BY position",
+      [examId]
+    );
+
+    res.json({
+      attemptId: attempt.id,
+      startedAt: attempt.started_at,
+      durationMinutes: exam.duration_minutes,
+      title: exam.title,
+      course: exam.course,
+      questions: questionsResult.rows,
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.post("/api/exams/:id/submit", authMiddleware, async (req, res) => {
+  try {
+    const examId = req.params.id;
+    const { answers } = req.body; // [{ questionId, selectedIndex }]
+
+    const attemptResult = await pool.query(
+      "SELECT * FROM exam_attempts WHERE exam_id = $1 AND student_id = $2",
+      [examId, req.user.id]
+    );
+    if (attemptResult.rows.length === 0) {
+      return res.status(404).json({ message: "No attempt found — start the exam first" });
+    }
+    const attempt = attemptResult.rows[0];
+    if (attempt.status === "submitted") {
+      return res.status(409).json({ message: "Already submitted" });
+    }
+
+    // Enforce the time limit server-side — never trust a frontend countdown alone
+    const examResult = await pool.query("SELECT duration_minutes FROM exams WHERE id = $1", [examId]);
+    const durationMinutes = examResult.rows[0].duration_minutes;
+    const deadline = new Date(attempt.started_at).getTime() + durationMinutes * 60000;
+    if (Date.now() > deadline + 15000) {
+      return res.status(400).json({ message: "Time's up — this exam can no longer be submitted" });
+    }
+
+    const questionsResult = await pool.query(
+      "SELECT id, correct_index FROM exam_questions WHERE exam_id = $1",
+      [examId]
+    );
+    const correctMap = {};
+    questionsResult.rows.forEach((q) => { correctMap[q.id] = q.correct_index; });
+
+    let correctCount = 0;
+    for (const ans of answers) {
+      if (correctMap[ans.questionId] === ans.selectedIndex) correctCount++;
+      await pool.query(
+        `INSERT INTO exam_answers(attempt_id, question_id, selected_index) VALUES($1, $2, $3)
+         ON CONFLICT (attempt_id, question_id) DO UPDATE SET selected_index = $3`,
+        [attempt.id, ans.questionId, ans.selectedIndex]
+      );
+    }
+
+    const score = Math.round((correctCount / questionsResult.rows.length) * 100);
+
+    await pool.query(
+      "UPDATE exam_attempts SET status = 'submitted', submitted_at = NOW(), score = $1 WHERE id = $2",
+      [score, attempt.id]
+    );
+
+    res.json({ message: "Exam submitted", score, correctCount, total: questionsResult.rows.length });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 app.listen(port, ()=>{
     console.log("server started on port 5000");   
 })
