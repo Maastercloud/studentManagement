@@ -6,6 +6,7 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import Landing from "./pages/Landing";
+import ExamTake from "./pages/ExamTake";
 
 export default function App() {
   return (
@@ -21,6 +22,9 @@ export default function App() {
             <ProtectedRoute adminOnly><AdminDashboard/></ProtectedRoute>
           }/>
           <Route path="/" element={<Landing/>} />
+          <Route path="/exam/:id" element={
+  <ProtectedRoute><ExamTake /></ProtectedRoute>
+} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

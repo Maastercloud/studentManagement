@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "../api";
 import { useAuth } from "../context/AuthContext";
+import { Link } from "react-router-dom";
 
 const NAV_ITEMS = [
   { id: "overview", label: "Overview", icon: (
@@ -16,25 +17,30 @@ const NAV_ITEMS = [
     <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
   )},
   { id: "attendance", label: "Attendance", icon: (
-  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-)},
-{ id: "fees", label: "Fees", icon: (
-  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 12v-2m9-4a9 9 0 11-18 0 9 9 0 0118 0z" />
-)},
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+  )},
+  { id: "fees", label: "Fees", icon: (
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 12v-2m9-4a9 9 0 11-18 0 9 9 0 0118 0z" />
+  )},
+  { id: "exams", label: "Exams", icon: (
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  )},
 ];
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [message, setMessage] = useState("Loading your details…");
-  const [attendance, setAttendance] = useState([]);
-const [attendanceLoading, setAttendanceLoading] = useState(true);
-const [markingAttendance, setMarkingAttendance] = useState(false);
-const [attendanceMsg, setAttendanceMsg] = useState(null);
 
-const [fees, setFees] = useState(null);
-const [feesLoading, setFeesLoading] = useState(true);
-const [payingFees, setPayingFees] = useState(false);
+  const [attendance, setAttendance] = useState([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(true);
+  const [markingAttendance, setMarkingAttendance] = useState(false);
+  const [attendanceMsg, setAttendanceMsg] = useState(null);
+
+  const [fees, setFees] = useState(null);
+  const [feesLoading, setFeesLoading] = useState(true);
+  const [payingFees, setPayingFees] = useState(false);
+
   const [courses, setCourses] = useState(() => {
     const saved = localStorage.getItem("demo_courses");
     return saved ? JSON.parse(saved) : [];
@@ -43,7 +49,11 @@ const [payingFees, setPayingFees] = useState(false);
   const [courseCode, setCourseCode] = useState("");
   const [results, setResults] = useState([]);
   const [resultsLoading, setResultsLoading] = useState(true);
-  const { email, role,learnerId, logout } = useAuth();
+
+  const [exams, setExams] = useState([]);
+  const [examsLoading, setExamsLoading] = useState(true);
+
+  const { email, role, learnerId, logout } = useAuth();
 
   useEffect(() => {
     apiFetch("/api/dashboard")
@@ -63,28 +73,38 @@ const [payingFees, setPayingFees] = useState(false);
   }, [activeTab]);
 
   useEffect(() => {
-  if (activeTab !== "attendance") return;
-  setAttendanceLoading(true);
-  apiFetch("/api/attendance")
-    .then((res) => res.json())
-    .then(setAttendance)
-    .catch(() => setAttendance([]))
-    .finally(() => setAttendanceLoading(false));
-}, [activeTab]);
+    if (activeTab !== "attendance") return;
+    setAttendanceLoading(true);
+    apiFetch("/api/attendance")
+      .then((res) => res.json())
+      .then(setAttendance)
+      .catch(() => setAttendance([]))
+      .finally(() => setAttendanceLoading(false));
+  }, [activeTab]);
 
-useEffect(() => {
-  if (activeTab !== "fees") return;
-  loadFees();
-}, [activeTab]);
+  useEffect(() => {
+    if (activeTab !== "fees") return;
+    loadFees();
+  }, [activeTab]);
 
-function loadFees() {
-  setFeesLoading(true);
-  apiFetch("/api/fees")
-    .then((res) => res.json())
-    .then(setFees)
-    .catch(() => setFees(null))
-    .finally(() => setFeesLoading(false));
-}
+  useEffect(() => {
+    if (activeTab !== "exams") return;
+    setExamsLoading(true);
+    apiFetch("/api/exams")
+      .then((res) => res.json())
+      .then(setExams)
+      .catch(() => setExams([]))
+      .finally(() => setExamsLoading(false));
+  }, [activeTab]);
+
+  function loadFees() {
+    setFeesLoading(true);
+    apiFetch("/api/fees")
+      .then((res) => res.json())
+      .then(setFees)
+      .catch(() => setFees(null))
+      .finally(() => setFeesLoading(false));
+  }
 
   function addCourse(e) {
     e.preventDefault();
@@ -104,7 +124,7 @@ function loadFees() {
 
   function selectTab(id) {
     setActiveTab(id);
-    setSidebarOpen(false); // auto-close drawer on mobile after picking a tab
+    setSidebarOpen(false);
   }
 
   const average = results.length
@@ -118,56 +138,57 @@ function loadFees() {
   }
 
   const todayStr = new Date().toISOString().slice(0, 10);
-const markedToday = attendance.some((a) => a.date.slice(0, 10) === todayStr);
+  const markedToday = attendance.some((a) => a.date.slice(0, 10) === todayStr);
 
-async function markAttendance() {
-  setMarkingAttendance(true);
-  setAttendanceMsg(null);
-  try {
-    const res = await apiFetch("/api/attendance/mark", { method: "POST" });
-    const data = await res.json();
-    if (!res.ok) {
-      setAttendanceMsg({ type: "error", text: data.message });
-      return;
+  async function markAttendance() {
+    setMarkingAttendance(true);
+    setAttendanceMsg(null);
+    try {
+      const res = await apiFetch("/api/attendance/mark", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setAttendanceMsg({ type: "error", text: data.message });
+        return;
+      }
+      setAttendanceMsg({ type: "success", text: data.message });
+      const refreshed = await apiFetch("/api/attendance").then((r) => r.json());
+      setAttendance(refreshed);
+    } catch (err) {
+      setAttendanceMsg({ type: "error", text: "Couldn't reach the server." });
+    } finally {
+      setMarkingAttendance(false);
     }
-    setAttendanceMsg({ type: "success", text: data.message });
-    const refreshed = await apiFetch("/api/attendance").then((r) => r.json());
-    setAttendance(refreshed);
-  } catch (err) {
-    setAttendanceMsg({ type: "error", text: "Couldn't reach the server." });
-  } finally {
-    setMarkingAttendance(false);
   }
-}
 
-function payFees() {
-  if (!fees || fees.balance <= 0) return;
-  setPayingFees(true);
+  function payFees() {
+    if (!fees || fees.balance <= 0) return;
+    setPayingFees(true);
 
-  const reference = `FEE-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const reference = `FEE-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 
-  const handler = window.PaystackPop.setup({
-    key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
-    email: email,
-    amount: Math.round(fees.balance * 100),
-    ref: reference,
-    currency: "NGN",
-    callback: function (response) {
-      apiFetch("/api/fees/verify", {
-        method: "POST",
-        body: JSON.stringify({ reference: response.reference }),
-      })
-        .then((res) => res.json())
-        .then(() => loadFees())
-        .finally(() => setPayingFees(false));
-    },
-    onClose: function () {
-      setPayingFees(false);
-    },
-  });
+    const handler = window.PaystackPop.setup({
+      key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+      email: email,
+      amount: Math.round(fees.balance * 100),
+      ref: reference,
+      currency: "NGN",
+      callback: function (response) {
+        apiFetch("/api/fees/verify", {
+          method: "POST",
+          body: JSON.stringify({ reference: response.reference }),
+        })
+          .then((res) => res.json())
+          .then(() => loadFees())
+          .finally(() => setPayingFees(false));
+      },
+      onClose: function () {
+        setPayingFees(false);
+      },
+    });
 
-  handler.openIframe();
-}
+    handler.openIframe();
+  }
+
   const sidebarContent = (
     <>
       <div className="flex items-center justify-between mb-1 px-1">
@@ -201,7 +222,6 @@ function payFees() {
             </svg>
             {item.label}
           </button>
-          
         ))}
       </nav>
 
@@ -258,6 +278,9 @@ function payFees() {
             {activeTab === "courses" && "Manage the courses you're enrolled in."}
             {activeTab === "results" && "Your grades for completed coursework."}
             {activeTab === "profile" && "Your account details."}
+            {activeTab === "attendance" && "Mark yourself present for today."}
+            {activeTab === "fees" && "Your termly balance and payment history."}
+            {activeTab === "exams" && "Take an exam when you're ready."}
           </p>
 
           {/* OVERVIEW */}
@@ -376,6 +399,10 @@ function payFees() {
                   <dt className="text-neutral-500">Email</dt>
                   <dd className="text-black font-medium">{email}</dd>
                 </div>
+                <div className="flex justify-between border-b border-neutral-200 pb-3">
+                  <dt className="text-neutral-500">Learner ID</dt>
+                  <dd className="text-black font-mono font-medium">{learnerId}</dd>
+                </div>
                 <div className="flex justify-between">
                   <dt className="text-neutral-500">Account type</dt>
                   <dd>
@@ -383,111 +410,141 @@ function payFees() {
                       {role}
                     </span>
                   </dd>
-                  <div className="flex justify-between border-b border-neutral-200 pb-3">
-  <dt className="text-neutral-500">Learner ID</dt>
-  <dd className="text-black font-mono font-medium">{learnerId}</dd>
-</div>
                 </div>
               </dl>
             </div>
-
-            
           )}
+
           {/* ATTENDANCE */}
-{activeTab === "attendance" && (
-  <div className="bg-white border border-neutral-200 p-6 animate-fade-in">
-    <h2 className="text-black font-semibold mb-1">Attendance</h2>
-    <p className="text-neutral-500 text-sm mb-5">Mark yourself present for today.</p>
+          {activeTab === "attendance" && (
+            <div className="bg-white border border-neutral-200 p-6 animate-fade-in">
+              <h2 className="text-black font-semibold mb-1">Attendance</h2>
+              <p className="text-neutral-500 text-sm mb-5">Mark yourself present for today.</p>
 
-    <button
-      onClick={markAttendance}
-      disabled={markingAttendance || markedToday}
-      className="px-5 py-2.5 bg-black hover:bg-neutral-800 disabled:opacity-40 text-white text-sm font-semibold transition-colors mb-2"
-    >
-      {markedToday ? "Marked present today" : markingAttendance ? "Marking…" : "Mark today's attendance"}
-    </button>
+              <button
+                onClick={markAttendance}
+                disabled={markingAttendance || markedToday}
+                className="px-5 py-2.5 bg-black hover:bg-neutral-800 disabled:opacity-40 text-white text-sm font-semibold transition-colors mb-2"
+              >
+                {markedToday ? "Marked present today" : markingAttendance ? "Marking…" : "Mark today's attendance"}
+              </button>
 
-    {attendanceMsg && (
-      <p className={`text-sm mt-2 ${attendanceMsg.type === "error" ? "text-neutral-600" : "text-black"}`}>
-        {attendanceMsg.text}
-      </p>
-    )}
+              {attendanceMsg && (
+                <p className={`text-sm mt-2 ${attendanceMsg.type === "error" ? "text-neutral-600" : "text-black"}`}>
+                  {attendanceMsg.text}
+                </p>
+              )}
 
-    <div className="mt-6">
-      <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-3">History</h3>
-      {attendanceLoading ? (
-        <p className="text-neutral-400 text-sm">Loading…</p>
-      ) : attendance.length === 0 ? (
-        <p className="text-neutral-400 text-sm">No attendance recorded yet.</p>
-      ) : (
-        <div className="space-y-1.5">
-          {attendance.map((a, i) => (
-            <div key={i} className="text-sm text-black border-b border-neutral-100 py-2">
-              {new Date(a.date).toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  </div>
-)}
-
-{/* FEES */}
-{activeTab === "fees" && (
-  <div className="bg-white border border-neutral-200 p-6 animate-fade-in">
-    <h2 className="text-black font-semibold mb-1">Fees</h2>
-    <p className="text-neutral-500 text-sm mb-5">Your termly balance and payment history.</p>
-
-    {feesLoading ? (
-      <p className="text-neutral-400 text-sm">Loading…</p>
-    ) : (
-      <>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
-          <div className="border border-neutral-200 p-4">
-            <div className="text-lg font-bold text-black">₦{fees.totalDue.toLocaleString()}</div>
-            <div className="text-xs text-neutral-500 mt-1">Total due</div>
-          </div>
-          <div className="border border-neutral-200 p-4">
-            <div className="text-lg font-bold text-black">₦{fees.totalPaid.toLocaleString()}</div>
-            <div className="text-xs text-neutral-500 mt-1">Paid so far</div>
-          </div>
-          <div className="border border-neutral-200 p-4">
-            <div className="text-lg font-bold text-black">₦{fees.balance.toLocaleString()}</div>
-            <div className="text-xs text-neutral-500 mt-1">Balance</div>
-          </div>
-        </div>
-
-        {fees.balance > 0 ? (
-          <button
-            onClick={payFees}
-            disabled={payingFees}
-            className="px-5 py-2.5 bg-black hover:bg-neutral-800 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
-          >
-            {payingFees ? "Processing…" : `Pay ₦${fees.balance.toLocaleString()}`}
-          </button>
-        ) : (
-          <p className="text-sm text-black font-medium">Fully paid — thank you.</p>
-        )}
-
-        <div className="mt-6">
-          <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-3">Payment history</h3>
-          {fees.payments.length === 0 ? (
-            <p className="text-neutral-400 text-sm">No payments yet.</p>
-          ) : (
-            <div className="space-y-1.5">
-              {fees.payments.map((p, i) => (
-                <div key={i} className="flex justify-between text-sm border-b border-neutral-100 py-2">
-                  <span className="text-black">₦{Number(p.amount).toLocaleString()}</span>
-                  <span className="text-neutral-500">{new Date(p.paid_at).toLocaleDateString()}</span>
-                </div>
-              ))}
+              <div className="mt-6">
+                <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-3">History</h3>
+                {attendanceLoading ? (
+                  <p className="text-neutral-400 text-sm">Loading…</p>
+                ) : attendance.length === 0 ? (
+                  <p className="text-neutral-400 text-sm">No attendance recorded yet.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {attendance.map((a, i) => (
+                      <div key={i} className="text-sm text-black border-b border-neutral-100 py-2">
+                        {new Date(a.date).toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
-        </div>
-      </>
-    )}
-  </div>
-)}
+
+          {/* FEES */}
+          {activeTab === "fees" && (
+            <div className="bg-white border border-neutral-200 p-6 animate-fade-in">
+              <h2 className="text-black font-semibold mb-1">Fees</h2>
+              <p className="text-neutral-500 text-sm mb-5">Your termly balance and payment history.</p>
+
+              {feesLoading ? (
+                <p className="text-neutral-400 text-sm">Loading…</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+                    <div className="border border-neutral-200 p-4">
+                      <div className="text-lg font-bold text-black">₦{fees.totalDue.toLocaleString()}</div>
+                      <div className="text-xs text-neutral-500 mt-1">Total due</div>
+                    </div>
+                    <div className="border border-neutral-200 p-4">
+                      <div className="text-lg font-bold text-black">₦{fees.totalPaid.toLocaleString()}</div>
+                      <div className="text-xs text-neutral-500 mt-1">Paid so far</div>
+                    </div>
+                    <div className="border border-neutral-200 p-4">
+                      <div className="text-lg font-bold text-black">₦{fees.balance.toLocaleString()}</div>
+                      <div className="text-xs text-neutral-500 mt-1">Balance</div>
+                    </div>
+                  </div>
+
+                  {fees.balance > 0 ? (
+                    <button
+                      onClick={payFees}
+                      disabled={payingFees}
+                      className="px-5 py-2.5 bg-black hover:bg-neutral-800 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+                    >
+                      {payingFees ? "Processing…" : `Pay ₦${fees.balance.toLocaleString()}`}
+                    </button>
+                  ) : (
+                    <p className="text-sm text-black font-medium">Fully paid — thank you.</p>
+                  )}
+
+                  <div className="mt-6">
+                    <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-3">Payment history</h3>
+                    {fees.payments.length === 0 ? (
+                      <p className="text-neutral-400 text-sm">No payments yet.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {fees.payments.map((p, i) => (
+                          <div key={i} className="flex justify-between text-sm border-b border-neutral-100 py-2">
+                            <span className="text-black">₦{Number(p.amount).toLocaleString()}</span>
+                            <span className="text-neutral-500">{new Date(p.paid_at).toLocaleDateString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* EXAMS */}
+          {activeTab === "exams" && (
+            <div className="bg-white border border-neutral-200 p-6 animate-fade-in">
+              <h2 className="text-black font-semibold mb-1">Exams</h2>
+              <p className="text-neutral-500 text-sm mb-5">Take an exam when you're ready — once started, the timer can't be paused.</p>
+
+              {examsLoading ? (
+                <p className="text-neutral-400 text-sm">Loading…</p>
+              ) : exams.length === 0 ? (
+                <p className="text-neutral-400 text-sm">No exams available yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {exams.map((ex) => (
+                    <div key={ex.id} className="flex items-center justify-between border border-neutral-200 px-4 py-3">
+                      <div>
+                        <div className="text-black text-sm font-medium">{ex.title}</div>
+                        <div className="text-neutral-500 text-xs mt-0.5">{ex.course} · {ex.duration_minutes} min</div>
+                      </div>
+                      {ex.attempt_status === "submitted" ? (
+                        <span className="text-xs font-bold px-2.5 py-1 border border-black text-black">Score: {ex.score}%</span>
+                      ) : (
+                        <Link
+                          to={`/exam/${ex.id}`}
+                          className="text-xs font-semibold bg-black hover:bg-neutral-800 text-white px-4 py-2 transition-colors"
+                        >
+                          {ex.attempt_status === "in_progress" ? "Resume" : "Start exam"}
+                        </Link>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </main>
       </div>
     </div>

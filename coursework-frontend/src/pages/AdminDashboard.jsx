@@ -15,6 +15,9 @@ const NAV_ITEMS = [
   { id: "broadsheet", label: "Results Broadsheet", icon: (
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m6 10V7M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
   )},
+  { id: "exams", label: "Create Exam", icon: (
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+  )},
 ];
 
 export default function AdminDashboard() {
@@ -28,7 +31,7 @@ export default function AdminDashboard() {
   // Upload
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState(null); // { type: 'success'|'error', text }
+  const [uploadStatus, setUploadStatus] = useState(null);
   const [uploadErrors, setUploadErrors] = useState([]);
 
   // Students
@@ -44,6 +47,18 @@ export default function AdminDashboard() {
   const [broadsheetRows, setBroadsheetRows] = useState([]);
   const [broadsheetLoading, setBroadsheetLoading] = useState(false);
 
+  // Exam
+  const [examCourse, setExamCourse] = useState("");
+  const [examTitle, setExamTitle] = useState("");
+  const [examDuration, setExamDuration] = useState(30);
+  const [examQuestions, setExamQuestions] = useState([
+    { questionText: "", options: ["", "", "", ""], correctIndex: 0 },
+  ]);
+  const [creatingExam, setCreatingExam] = useState(false);
+  const [examStatus, setExamStatus] = useState(null);
+  const [existingExams, setExistingExams] = useState([]);
+  const [existingExamsLoaded, setExistingExamsLoaded] = useState(false);
+
   useEffect(() => {
     apiFetch("/api/admin/stats")
       .then((res) => res.json())
@@ -54,7 +69,78 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (activeTab === "students" && !studentsLoaded) loadStudents();
     if (activeTab === "broadsheet" && !coursesLoaded) loadCourses();
+    if (activeTab === "exams" && !existingExamsLoaded) loadExams();
   }, [activeTab]);
+
+  async function loadExams() {
+    try {
+      const res = await apiFetch("/api/admin/exams");
+      setExistingExams(await res.json());
+      setExistingExamsLoaded(true);
+    } catch (err) {}
+  }
+
+  function addQuestion() {
+    setExamQuestions([...examQuestions, { questionText: "", options: ["", "", "", ""], correctIndex: 0 }]);
+  }
+
+  function removeQuestion(index) {
+    setExamQuestions(examQuestions.filter((_, i) => i !== index));
+  }
+
+  function updateQuestionText(index, text) {
+    const updated = [...examQuestions];
+    updated[index].questionText = text;
+    setExamQuestions(updated);
+  }
+
+  function updateOption(qIndex, oIndex, text) {
+    const updated = [...examQuestions];
+    updated[qIndex].options[oIndex] = text;
+    setExamQuestions(updated);
+  }
+
+  function setCorrect(qIndex, oIndex) {
+    const updated = [...examQuestions];
+    updated[qIndex].correctIndex = oIndex;
+    setExamQuestions(updated);
+  }
+
+  async function submitExam(e) {
+    e.preventDefault();
+    setCreatingExam(true);
+    setExamStatus(null);
+
+    try {
+      const res = await apiFetch("/api/admin/exams", {
+        method: "POST",
+        body: JSON.stringify({
+          course: examCourse,
+          title: examTitle,
+          durationMinutes: Number(examDuration),
+          questions: examQuestions,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setExamStatus({ type: "error", text: data.message });
+        return;
+      }
+
+      setExamStatus({ type: "success", text: "Exam created." });
+      setExamCourse("");
+      setExamTitle("");
+      setExamDuration(30);
+      setExamQuestions([{ questionText: "", options: ["", "", "", ""], correctIndex: 0 }]);
+      setExistingExamsLoaded(false);
+      loadExams();
+    } catch (err) {
+      setExamStatus({ type: "error", text: "Couldn't reach the server." });
+    } finally {
+      setCreatingExam(false);
+    }
+  }
 
   async function loadStudents() {
     try {
@@ -102,7 +188,6 @@ export default function AdminDashboard() {
       setUploadErrors(data.errors || []);
       e.target.reset();
 
-      // refresh stats + course list since new data may have landed
       apiFetch("/api/admin/stats").then((r) => r.json()).then(setStats).catch(() => {});
       setCoursesLoaded(false);
     } catch (err) {
@@ -158,6 +243,7 @@ export default function AdminDashboard() {
     upload: "Import grades in bulk from a spreadsheet.",
     students: "Every account on the portal, newest first.",
     broadsheet: "Pick a course to see every student's score for it.",
+    exams: "Build a timed, multiple-choice exam for a course.",
   };
 
   const sidebarContent = (
@@ -327,11 +413,11 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody>
                     {filteredStudents.length === 0 ? (
-                      <tr><td colSpan={4} className="py-6 text-center text-neutral-400">No accounts found.</td></tr>
+                      <tr><td colSpan={5} className="py-6 text-center text-neutral-400">No accounts found.</td></tr>
                     ) : (
                       filteredStudents.map((u) => (
                         <tr key={u.email} className="border-b border-neutral-100">
-                            <td className="py-3 text-black font-mono text-xs">{u.learner_id || "—"}</td>
+                          <td className="py-3 text-black font-mono text-xs">{u.learner_id || "—"}</td>
                           <td className="py-3 text-black">{u.email}</td>
                           <td className="py-3">
                             <span className={`text-xs font-bold px-2 py-0.5 border capitalize ${u.role === "admin" ? "border-black text-black" : "border-neutral-300 text-neutral-500"}`}>
@@ -401,6 +487,137 @@ export default function AdminDashboard() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* EXAMS */}
+          {activeTab === "exams" && (
+            <div className="space-y-5 animate-fade-in">
+              <div className="bg-white border border-neutral-200 p-6">
+                <h2 className="text-black font-semibold mb-1">Create Exam</h2>
+                <p className="text-neutral-500 text-sm mb-5">Build a timed, multiple-choice exam for a course.</p>
+
+                <form onSubmit={submitExam} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <input
+                      value={examCourse}
+                      onChange={(e) => setExamCourse(e.target.value)}
+                      placeholder="Course (e.g. CS201)"
+                      required
+                      className="px-3.5 py-2.5 border border-neutral-300 text-black placeholder-neutral-400 text-sm focus:outline-none focus:border-black"
+                    />
+                    <input
+                      value={examTitle}
+                      onChange={(e) => setExamTitle(e.target.value)}
+                      placeholder="Exam title"
+                      required
+                      className="px-3.5 py-2.5 border border-neutral-300 text-black placeholder-neutral-400 text-sm focus:outline-none focus:border-black"
+                    />
+                    <input
+                      type="number"
+                      value={examDuration}
+                      onChange={(e) => setExamDuration(e.target.value)}
+                      placeholder="Duration (minutes)"
+                      min={1}
+                      required
+                      className="px-3.5 py-2.5 border border-neutral-300 text-black placeholder-neutral-400 text-sm focus:outline-none focus:border-black"
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    {examQuestions.map((q, qIndex) => (
+                      <div key={qIndex} className="border border-neutral-200 p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-xs font-semibold text-neutral-500 uppercase">Question {qIndex + 1}</p>
+                          {examQuestions.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeQuestion(qIndex)}
+                              className="text-xs text-neutral-500 hover:text-black underline"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+
+                        <input
+                          value={q.questionText}
+                          onChange={(e) => updateQuestionText(qIndex, e.target.value)}
+                          placeholder="Question text"
+                          required
+                          className="w-full px-3.5 py-2.5 border border-neutral-300 text-black placeholder-neutral-400 text-sm mb-3 focus:outline-none focus:border-black"
+                        />
+
+                        <div className="space-y-2">
+                          {q.options.map((opt, oIndex) => (
+                            <div key={oIndex} className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name={`correct-${qIndex}`}
+                                checked={q.correctIndex === oIndex}
+                                onChange={() => setCorrect(qIndex, oIndex)}
+                                className="accent-black shrink-0"
+                              />
+                              <input
+                                value={opt}
+                                onChange={(e) => updateOption(qIndex, oIndex, e.target.value)}
+                                placeholder={`Option ${oIndex + 1}`}
+                                required
+                                className="flex-1 px-3 py-2 border border-neutral-300 text-black placeholder-neutral-400 text-sm focus:outline-none focus:border-black"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-neutral-400 mt-2">Select the radio button next to the correct answer.</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={addQuestion}
+                    className="text-sm font-semibold border border-neutral-300 hover:border-black px-4 py-2 transition-colors"
+                  >
+                    + Add question
+                  </button>
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      type="submit"
+                      disabled={creatingExam}
+                      className="bg-black hover:bg-neutral-800 disabled:opacity-50 text-white text-sm font-semibold px-6 py-2.5 transition-colors"
+                    >
+                      {creatingExam ? "Creating…" : "Create exam"}
+                    </button>
+                    {examStatus && (
+                      <p className={`text-sm ${examStatus.type === "error" ? "text-neutral-600" : "text-black font-medium"}`}>
+                        {examStatus.text}
+                      </p>
+                    )}
+                  </div>
+                </form>
+              </div>
+
+              <div className="bg-white border border-neutral-200 p-6">
+                <h2 className="text-black font-semibold mb-4">Existing Exams</h2>
+                {existingExams.length === 0 ? (
+                  <p className="text-neutral-400 text-sm">No exams created yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {existingExams.map((ex) => (
+                      <div key={ex.id} className="flex items-center justify-between border border-neutral-200 px-4 py-3 text-sm">
+                        <div>
+                          <span className="text-black font-medium">{ex.title}</span>
+                          <span className="text-neutral-500 ml-2">{ex.course} · {ex.duration_minutes} min</span>
+                        </div>
+                        <span className="text-neutral-500 text-xs">
+                          {ex.question_count} question(s) · {ex.attempt_count} attempt(s)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
