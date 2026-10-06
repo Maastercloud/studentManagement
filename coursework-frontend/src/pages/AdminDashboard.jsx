@@ -338,6 +338,30 @@ export default function AdminDashboard() {
                     <div className="text-xs text-neutral-500 mt-1">{stat.label}</div>
                   </div>
                 ))}
+                {activeTab === "overview" && (
+  <div className="space-y-5 animate-fade-in">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* existing stat cards */}
+    </div>
+
+    {/* NEW — put this right here */}
+    <div className="bg-white border border-neutral-200 p-6">
+      <h2 className="text-black font-semibold mb-1">Your School Code</h2>
+      <p className="text-neutral-500 text-sm mb-3">
+        Share this with students so they can join your school when they sign up.
+      </p>
+      <div className="flex items-center gap-3">
+        <p className="text-xl font-mono font-bold text-black">{stats?.schoolCode}</p>
+        <button
+          onClick={() => navigator.clipboard.writeText(stats?.schoolCode || "")}
+          className="text-xs font-semibold border border-neutral-300 hover:border-black px-3 py-1.5 transition-colors"
+        >
+          Copy
+        </button>
+      </div>
+    </div>
+  </div>
+)}
               </div>
               <div className="bg-white border border-neutral-200 p-6">
                 <h2 className="text-black font-semibold mb-1">Welcome</h2>

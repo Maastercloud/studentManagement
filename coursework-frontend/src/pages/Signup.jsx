@@ -5,6 +5,7 @@ import { apiFetch } from "../api";
 export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [schoolCode, setSchoolCode] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -30,7 +31,7 @@ async function handleSubmit(e) {
   try {
     const res = await apiFetch("/api/signup", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, schoolCode: schoolCode.trim().toUpperCase() }),
     });
     const data = await res.json();
 
@@ -67,6 +68,26 @@ async function handleSubmit(e) {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+  <label className="flex items-center gap-2 text-xs font-semibold text-white/60 mb-1.5 uppercase tracking-wide">
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l6.16-3.42A12.083 12.083 0 0112 21a12.083 12.083 0 01-6.16-10.42L12 14z" />
+    </svg>
+    School Code
+  </label>
+  <input
+    type="text"
+    value={schoolCode}
+    onChange={(e) => setSchoolCode(e.target.value)}
+    required
+    placeholder="SCHOOL-A1B2C3"
+    className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.12] text-white placeholder-white/30 text-sm uppercase
+               focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white/30 focus:bg-white/[0.07]
+               transition-all duration-200"
+  />
+  <p className="text-xs text-white/35 mt-1.5">Get this from your school's admin.</p>
+</div>
             <div>
               <label className="flex items-center gap-2 text-xs font-semibold text-white/60 mb-1.5 uppercase tracking-wide">
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

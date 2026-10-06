@@ -86,7 +86,9 @@ export default function Landing() {
               I already have one
             </Link>
           </div>
-          <p className="text-white/30 text-xs mt-5">Free to join. No card required.</p>
+          <p className="text-white/30 text-xs mt-5">
+  Students: you'll need a school code from your admin to sign up.
+</p>
         </div>
       </section>
 
