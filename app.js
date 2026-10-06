@@ -170,7 +170,6 @@ app.post("/api/admin/promote", authMiddleware, requireAdmin, async(req, res)=>{
       return res.status(400).json({message: "Invalid role"});
     }
 
-    // Only let an admin act on their own students
     const check = await pool.query(
       "SELECT id FROM users WHERE email = $1 AND admin_id = $2",
       [email, req.user.id]
@@ -181,7 +180,8 @@ app.post("/api/admin/promote", authMiddleware, requireAdmin, async(req, res)=>{
 
     let signupCode = null;
     if (role === "admin") {
-      signupCode = `SCHOOL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      const promotedId = check.rows[0].id;
+      signupCode = `S0${String(promotedId).padStart(4, "0")}`;
     }
 
     const result = await pool.query(
@@ -206,12 +206,15 @@ app.get("/api/admin/stats", authMiddleware, requireAdmin, async (req, res) => {
     const avgScore = await pool.query(
       "SELECT AVG(r.score) FROM results r JOIN users u ON u.id = r.student_id WHERE u.admin_id = $1", [req.user.id]
     );
-    const adminResult = await pool.query("SELECT signup_code FROM users WHERE id = $1", [req.user.id]);
+    const adminResult = await pool.query(
+      "SELECT signup_code FROM users WHERE id = $1", [req.user.id]
+    );
+
     res.json({
       totalStudents: Number(totalStudents.rows[0].count),
       totalResults: Number(totalResults.rows[0].count),
       avgScore: avgScore.rows[0].avg ? Number(avgScore.rows[0].avg).toFixed(1) : null,
-      schoolCode: req.user.email, // see note below
+      schoolCode: adminResult.rows[0].signup_code,
     });
   } catch (err) {
     console.log(err);

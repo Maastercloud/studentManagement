@@ -290,7 +290,7 @@ export default function Dashboard() {
                 {[
                   { label: "Courses enrolled", value: courses.length },
                   { label: "Average grade", value: average ?? "—" },
-                  { label: "Account type", value: role },
+                  { label: "Account type", value: role},
                 ].map((stat) => (
                   <div key={stat.label} className="bg-white border border-neutral-200 p-5">
                     <div className="text-2xl font-bold text-black capitalize">{stat.value}</div>
