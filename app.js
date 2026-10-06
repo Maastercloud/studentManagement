@@ -47,34 +47,46 @@ function requireAdmin(req, res, next){
 // app.use(express.urlencoded({extended: true}));
 
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL
+    connectionString: process.env.DATABASE_URL,
+    ssl: {rejectUnauthorized: false}
 })
+
+
 app.post("/api/signup", async(req, res)=>{
   try {
-    const email = req.body["email"];
-    const password = req.body["password"];
+    const { email, password, schoolCode } = req.body;
+
+    if (!schoolCode) {
+      return res.status(400).json({ message: "School code is required" });
+    }
+
+    const adminResult = await pool.query(
+      "SELECT id FROM users WHERE signup_code = $1 AND role = 'admin'",
+      [schoolCode]
+    );
+    if (adminResult.rows.length === 0) {
+      return res.status(400).json({ message: "Invalid school code" });
+    }
+    const adminId = adminResult.rows[0].id;
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      "INSERT INTO users(email, password, role) VALUES($1, $2, 'student') RETURNING id, email",
-      [email, hashedPassword]
+      "INSERT INTO users(email, password, role, admin_id) VALUES($1, $2, 'student', $3) RETURNING id, email",
+      [email, hashedPassword, adminId]
     );
 
     const newUser = result.rows[0];
     const learnerId = `STU-${String(newUser.id).padStart(6, "0")}`;
-
     await pool.query("UPDATE users SET learner_id = $1 WHERE id = $2", [learnerId, newUser.id]);
 
     res.json({ id: newUser.id, learnerId });
-
   } catch (err) {
     console.log(err);
-    if (err.code === "23505") {
-      return res.status(409).json({ message: "Email already in use" });
-    }
+    if (err.code === "23505") return res.status(409).json({ message: "Email already in use" });
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 app.get("/signup", (req, res)=>{
     res.sendFile(__dirname + "/public/signup.html")
@@ -136,10 +148,12 @@ app.get("/api/admin/dashboard", authMiddleware, requireAdmin, (req, res)=>{
 app.get("/", (req, res)=>{
     res.sendFile(__dirname + "/public/landingpage.html")
 })
+
 app.get("/api/admin/students", authMiddleware, requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT id, email, learner_id, role, created_at FROM users ORDER BY created_at DESC"
+      "SELECT id, email, learner_id, role, created_at FROM users WHERE admin_id = $1 ORDER BY created_at DESC",
+      [req.user.id]
     );
     res.json(result.rows);
   } catch (err) {
@@ -148,32 +162,56 @@ app.get("/api/admin/students", authMiddleware, requireAdmin, async (req, res) =>
   }
 });
 
+
 app.post("/api/admin/promote", authMiddleware, requireAdmin, async(req, res)=>{
-    try {
-        const {email, password} = req.body;
-        if(!["email", "student"].includes(role)){
-            return res.status(401).json({message: "Invalid role"});
-        }
-        const result = await pool.query("UPDATE users SET role = $1 WHERE email = $2 RETURNING id, email, role", [role, email])
-        if(result.rows.length === 0){
-            return res.status(404).json({message: "User not found"});
-        }
-        res.json(result.rows[0])
-    } catch (err) {
-        console.log(err);
-        res.status(500).json({message: "Server error"});
+  try {
+    const {email, role} = req.body;
+    if(!["admin", "student"].includes(role)){
+      return res.status(400).json({message: "Invalid role"});
     }
+
+    // Only let an admin act on their own students
+    const check = await pool.query(
+      "SELECT id FROM users WHERE email = $1 AND admin_id = $2",
+      [email, req.user.id]
+    );
+    if (check.rows.length === 0) {
+      return res.status(404).json({ message: "User not found in your student list" });
+    }
+
+    let signupCode = null;
+    if (role === "admin") {
+      signupCode = `SCHOOL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    }
+
+    const result = await pool.query(
+      "UPDATE users SET role = $1, signup_code = COALESCE($2, signup_code) WHERE email = $3 RETURNING id, email, role, signup_code",
+      [role, signupCode, email]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({message: "Server error"});
+  }
 })
+
 app.get("/api/admin/stats", authMiddleware, requireAdmin, async (req, res) => {
   try {
-    const totalStudents = await pool.query("SELECT COUNT(*) FROM users WHERE role = 'student'");
-    const totalResults = await pool.query("SELECT COUNT(*) FROM results");
-    const avgScore = await pool.query("SELECT AVG(score) FROM results");
-
+    const totalStudents = await pool.query(
+      "SELECT COUNT(*) FROM users WHERE role = 'student' AND admin_id = $1", [req.user.id]
+    );
+    const totalResults = await pool.query(
+      "SELECT COUNT(*) FROM results r JOIN users u ON u.id = r.student_id WHERE u.admin_id = $1", [req.user.id]
+    );
+    const avgScore = await pool.query(
+      "SELECT AVG(r.score) FROM results r JOIN users u ON u.id = r.student_id WHERE u.admin_id = $1", [req.user.id]
+    );
+    const adminResult = await pool.query("SELECT signup_code FROM users WHERE id = $1", [req.user.id]);
     res.json({
       totalStudents: Number(totalStudents.rows[0].count),
       totalResults: Number(totalResults.rows[0].count),
-      avgScore: avgScore.rows[0].avg ? Number(avgScore.rows[0].avg).toFixed(1) : null
+      avgScore: avgScore.rows[0].avg ? Number(avgScore.rows[0].avg).toFixed(1) : null,
+      schoolCode: req.user.email, // see note below
     });
   } catch (err) {
     console.log(err);
@@ -205,7 +243,10 @@ app.post("/api/admin/upload-results", authMiddleware, requireAdmin, upload.singl
         continue;
       }
 
-      const userResult = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+      const userResult = await pool.query(
+  "SELECT id FROM users WHERE email = $1 AND admin_id = $2",
+  [email, req.user.id]
+);
 
       if (userResult.rows.length === 0) {
         errors.push({ row, reason: "No student found with this email" });
@@ -271,7 +312,10 @@ app.get("/api/results", authMiddleware, async (req, res) => {
 });
 app.get("/api/admin/courses", authMiddleware, requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query("SELECT DISTINCT course FROM results ORDER BY course");
+    const result = await pool.query(
+      "SELECT DISTINCT r.course FROM results r JOIN users u ON u.id = r.student_id WHERE u.admin_id = $1 ORDER BY r.course",
+      [req.user.id]
+    );
     res.json(result.rows.map(r => r.course));
   } catch (err) {
     console.log(err);
@@ -282,19 +326,16 @@ app.get("/api/admin/courses", authMiddleware, requireAdmin, async (req, res) => 
 app.get("/api/admin/results", authMiddleware, requireAdmin, async (req, res) => {
   try {
     const { course } = req.query;
-
     let query = `
       SELECT u.email, r.course, r.assessment, r.score
-      FROM results r
-      JOIN users u ON u.id = r.student_id
+      FROM results r JOIN users u ON u.id = r.student_id
+      WHERE u.admin_id = $1
     `;
-    const params = [];
-
+    const params = [req.user.id];
     if (course) {
-      query += " WHERE r.course = $1";
+      query += " AND r.course = $2";
       params.push(course);
     }
-
     query += " ORDER BY u.email, r.assessment";
 
     const result = await pool.query(query, params);
@@ -402,10 +443,10 @@ app.post("/api/admin/exams", authMiddleware, requireAdmin, async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    const examResult = await pool.query(
-      "INSERT INTO exams(course, title, duration_minutes) VALUES($1, $2, $3) RETURNING id",
-      [course, title, durationMinutes || 30]
-    );
+   const examResult = await pool.query(
+  "INSERT INTO exams(course, title, duration_minutes, admin_id) VALUES($1, $2, $3, $4) RETURNING id",
+  [course, title, durationMinutes || 30, req.user.id]
+);
     const examId = examResult.rows[0].id;
 
     for (let i = 0; i < questions.length; i++) {
@@ -432,15 +473,17 @@ app.get("/api/admin/exams", authMiddleware, requireAdmin, async (req, res) => {
       FROM exams e
       LEFT JOIN exam_questions q ON q.exam_id = e.id
       LEFT JOIN exam_attempts a ON a.exam_id = e.id
+      WHERE e.admin_id = $1
       GROUP BY e.id
       ORDER BY e.created_at DESC
-    `);
+    `, [req.user.id]);
     res.json(result.rows);
   } catch (err) {
     console.log(err);
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 app.get("/api/exams", authMiddleware, async (req, res) => {
   try {
@@ -449,6 +492,7 @@ app.get("/api/exams", authMiddleware, async (req, res) => {
              a.status AS attempt_status, a.score
       FROM exams e
       LEFT JOIN exam_attempts a ON a.exam_id = e.id AND a.student_id = $1
+      WHERE e.admin_id = (SELECT admin_id FROM users WHERE id = $1)
       ORDER BY e.created_at DESC
     `, [req.user.id]);
     res.json(result.rows);
@@ -562,6 +606,9 @@ app.post("/api/exams/:id/submit", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+
+
 app.listen(port, ()=>{
     console.log("server started on port 5000");   
 })
